@@ -27,12 +27,18 @@ MAX_DIFFERENT = 7  # answers out of 256 that may differ for two scans to count a
 CHUNKS = 8
 
 
-def crop_to_content(grey: np.ndarray) -> np.ndarray:
-    """Cut away the near-white background around the bag."""
+def content_box(grey: np.ndarray) -> tuple[int, int, int, int]:
+    """(x0, y0, x1, y1) around everything darker than near-white background: roughly, the bag."""
     rows, cols = np.nonzero(grey < 230)
     if len(rows) == 0:
-        return grey
-    return grey[rows.min(): rows.max() + 1, cols.min(): cols.max() + 1]
+        return 0, 0, grey.shape[1], grey.shape[0]
+    return int(cols.min()), int(rows.min()), int(cols.max()) + 1, int(rows.max()) + 1
+
+
+def crop_to_content(grey: np.ndarray) -> np.ndarray:
+    """Cut away the near-white background around the bag."""
+    x0, y0, x1, y1 = content_box(grey)
+    return grey[y0:y1, x0:x1]
 
 
 def fingerprint(path: str) -> int:

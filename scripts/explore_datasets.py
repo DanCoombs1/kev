@@ -16,6 +16,7 @@ import numpy as np
 from PIL import Image
 
 from kev.data.sources import all_scans, image_size, scan_format
+from kev.metrics import auc
 
 PATCH = 16  # kev's patch size in pixels
 # Item types labelled in at least two datasets, matched on the lower-cased label.
@@ -32,21 +33,6 @@ def fullness(path: Path) -> float:
     with Image.open(path) as im:
         grey = np.asarray(im.convert("L").resize((200, 150)))
     return float((grey < 220).mean())
-
-
-def auc(threat: list[float], clean: list[float]) -> float:
-    """Chance a random threat bag scores higher than a random clean bag. 0.5 means the clue is useless."""
-    values = sorted(threat + clean)
-    rank = {}  # tied values share the average of their ranks, so a tie counts as half a win
-    i = 0
-    while i < len(values):
-        j = i
-        while j < len(values) and values[j] == values[i]:
-            j += 1
-        rank[values[i]] = (i + 1 + j) / 2
-        i = j
-    rank_sum = sum(rank[v] for v in threat)
-    return (rank_sum - len(threat) * (len(threat) + 1) / 2) / (len(threat) * len(clean))
 
 
 def main() -> None:
