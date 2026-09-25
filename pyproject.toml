@@ -1,0 +1,17 @@
+[project]
+name = "kev"
+version = "0.1.0"
+description = "A small System One decision model for X-ray baggage screening, built from scratch to learn how it works"
+requires-python = ">=3.12"
+dependencies = [
+    "numpy",
+    "pillow",
+    "torch",
+]
+
+[dependency-groups]
+dev = ["pytest"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
