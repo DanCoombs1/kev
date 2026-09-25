@@ -4,6 +4,7 @@ Writes PNG sheets to runs/explore/:
     1c_<dataset>.png          12 random scans from each dataset with their boxes drawn on
     1c_scale.png              the same item types cropped at native pixel size, one column per scanner
     1c_stcray_same_name.png   STCray train and test items that share a variant name, side by side
+    2a_unclear_labels.png     real examples of labels whose meaning is unclear from the name
 
     uv run python scripts/view_scans.py
 """
@@ -144,6 +145,19 @@ def stcray_same_name_sheet(scans: list[Scan], rng: random.Random) -> None:
     sheet(tiles, 2, (760, 250)).save(OUT / "1c_stcray_same_name.png")
 
 
+def unclear_labels_sheet(scans: list[Scan], rng: random.Random) -> None:
+    """Labels whose meaning isn't obvious from the name: look before deciding kev's item names."""
+    unclear = [("dvxray", "Bat"), ("dvxray", "Pressure_vessel"), ("dvxray", "Dart"), ("dvxray", "Fireworks"),
+               ("stcray", "Cutter"), ("stcray", "Blade"), ("stcray", "Other Sharp Item"), ("stcray", "Nail Cutter"),
+               ("iedxray", "Modified parts"), ("pidray", "Sprayer")]
+    tiles = []
+    for dataset, label in unclear:
+        found = [(s, i) for s in scans if s.dataset == dataset for i in s.items if i.label == label and i.box and i.view == 0]
+        images = [crop(s, i.box, i.view, margin=12) for s, i in rng.sample(found, 4)]
+        tiles.append((side_by_side(images, gap=24), f"{dataset}: {label}"))
+    sheet(tiles, 2, (760, 280)).save(OUT / "2a_unclear_labels.png")
+
+
 def main() -> None:
     OUT.mkdir(parents=True, exist_ok=True)
     rng = random.Random(0)  # fixed seed, so re-running shows the same scans
@@ -151,6 +165,7 @@ def main() -> None:
     dataset_sheets(scans, rng)
     scale_sheet(scans)
     stcray_same_name_sheet(scans, rng)
+    unclear_labels_sheet(scans, rng)
     for p in sorted(OUT.glob("1c_*.png")):
         print(p.relative_to(OUT.parents[1]))
 
