@@ -5,10 +5,12 @@ Writes PNG sheets to runs/explore/:
     1c_scale.png              the same item types cropped at native pixel size, one column per scanner
     1c_stcray_same_name.png   STCray train and test items that share a variant name, side by side
     2a_unclear_labels.png     real examples of labels whose meaning is unclear from the name
+    3a_duplicates_with_different_labels.png   near-copies whose two copies are labelled differently
 
     uv run python scripts/view_scans.py
 """
 
+import json
 import random
 import statistics
 from collections import defaultdict
@@ -158,15 +160,34 @@ def unclear_labels_sheet(scans: list[Scan], rng: random.Random) -> None:
     sheet(tiles, 2, (760, 280)).save(OUT / "2a_unclear_labels.png")
 
 
+def duplicate_pairs_sheet(scans: list[Scan], rng: random.Random) -> None:
+    """Near-copies found in Step 3a whose two copies carry different labels, drawn side by side."""
+    from kev.data.duplicates import DUPLICATES
+    from kev.data.sources import DATA
+
+    by_id = {str(s.views[0].relative_to(DATA).with_suffix("")): s for s in scans}
+    labels = lambda s: sorted(i.label for i in s.items if i.view == 0)
+    tiles = []
+    for dataset in ["pidray", "stcray"]:
+        pairs = [(by_id[p["a"]], by_id[p["b"]]) for p in json.loads(DUPLICATES.read_text())
+                 if p["a"].startswith(dataset) and p["b"].startswith(dataset)]
+        differing = [(a, b) for a, b in pairs if labels(a) != labels(b)]
+        for a, b in rng.sample(differing, 3):
+            tiles.append((side_by_side([draw_view(a, 0), draw_view(b, 0)], gap=30),
+                          f"{a.views[0].stem} {labels(a)}   vs   {b.views[0].stem} {labels(b)}"))
+    sheet(tiles, 1, (1400, 420)).save(OUT / "3a_duplicates_with_different_labels.png")
+
+
 def main() -> None:
     OUT.mkdir(parents=True, exist_ok=True)
     rng = random.Random(0)  # fixed seed, so re-running shows the same scans
     scans = list(all_scans())
+    duplicate_pairs_sheet(scans, rng)
     dataset_sheets(scans, rng)
     scale_sheet(scans)
     stcray_same_name_sheet(scans, rng)
     unclear_labels_sheet(scans, rng)
-    for p in sorted(OUT.glob("1c_*.png")):
+    for p in sorted(OUT.glob("*.png")):
         print(p.relative_to(OUT.parents[1]))
 
 
