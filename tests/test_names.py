@@ -1,12 +1,10 @@
-"""Check kev's naming table against the real datasets in data/."""
-
 from collections import defaultdict
 
 from kev.data.names import ALLOWED, GROUPS, KIND_OF, group, kev_name
 from kev.data.sources import all_scans
 
-LABELS = defaultdict(set)  # dataset -> every label it uses
-DANGEROUS = {}  # COMPASS-XP class -> its own "dangerous" flag
+LABELS = defaultdict(set)
+DANGEROUS = {}
 for scan in all_scans():
     for item in scan.items:
         LABELS[scan.dataset].add(item.label)
@@ -17,20 +15,19 @@ for scan in all_scans():
 def test_every_label_has_a_name_and_group():
     for dataset, labels in LABELS.items():
         for label in labels:
-            group(kev_name(dataset, label), dataset)  # raises if either is missing
+            group(kev_name(dataset, label), dataset)
 
 
 def test_compass_dangerous_flag_agrees_with_groups():
-    # kev's agreed policy treats all tools and syringes as restricted; COMPASS-XP calls its
-    # pliers, wrenches and syringes harmless. These are deliberate; any other disagreement is a mistake.
-    kev_stricter = {"pliers", "wrench", "syringe"}
+    # We restrict all tools and syringes; COMPASS-XP marks its pliers, wrenches and syringes harmless.
+    stricter = {"pliers", "wrench", "syringe"}
     for label, dangerous in DANGEROUS.items():
         name = kev_name("compass_xp", label)
         our_group = group(name, "compass_xp")
-        if name in kev_stricter:
+        if name in stricter:
             assert our_group != ALLOWED and not dangerous
             continue
-        assert (our_group != ALLOWED) == dangerous, f"{label}: COMPASS says dangerous={dangerous}, kev says {our_group}"
+        assert (our_group != ALLOWED) == dangerous, f"{label}: dangerous={dangerous}, group={our_group}"
 
 
 def test_general_names_exist():

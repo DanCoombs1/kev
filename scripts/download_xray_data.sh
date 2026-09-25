@@ -1,29 +1,20 @@
 #!/bin/bash
-# Download kev's X-ray datasets into data/. None of these need an account.
-#
-#   DvXray      5,000 threat bags + 11,000 clean bags, each X-rayed from two angles
-#               (Google Drive, 7.1 GB)
-#   COMPASS-XP  single objects X-rayed in many poses, labelled dangerous or not,
-#               CC-BY-4.0 (Zenodo, 5.9 GB)
-#   PIDray      47,677 scans containing prohibited items (Google Drive, 11.6 GB)
-#
-# Google Drive blocks a popular file for up to 24 hours after heavy use ("quota
-# exceeded"). The script reports that and exits non-zero; re-running it later
-# skips whatever already finished.
+# Downloads DvXray, COMPASS-XP and PIDray into data/. Re-run to resume; Google Drive
+# sometimes blocks popular files for up to a day ("quota exceeded").
 set -uo pipefail
 cd "$(dirname "$0")/../data" || exit 1
 
 gdrive() { echo "https://drive.usercontent.google.com/download?id=$1&export=download&confirm=t"; }
 
-get() {  # get <name> <url> <expected bytes> <folder to unzip into>
+get() {  # name url bytes dest
   local name=$1 url=$2 size=$3 dest=$4
   if [ -f "$dest/.complete_$name" ]; then
     echo "$name: already done"
     return 0
   fi
-  # A blocked Google Drive file answers with an HTML page instead of the file.
+  # a blocked Drive file returns an HTML page instead
   if ! curl -sIL "$url" | tr -d '\r' | grep -qi '^content-type: application/octet-stream'; then
-    echo "$name: not downloadable right now (Google Drive quota?), re-run later"
+    echo "$name: not available right now, re-run later"
     return 1
   fi
   echo "$name: downloading $((size / 1000000000)) GB"

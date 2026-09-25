@@ -1,5 +1,3 @@
-"""Check the train/val/test roles in data/curated.jsonl: groups never straddle the line, test sets stay official."""
-
 from collections import Counter, defaultdict
 
 import pytest
@@ -7,7 +5,7 @@ import pytest
 from kev.data.curate import CURATED, read
 
 if not CURATED.exists():
-    pytest.skip("build it first: uv run python -m kev.data.curate", allow_module_level=True)
+    pytest.skip("curated data not built: uv run python -m kev.data.curate", allow_module_level=True)
 
 LINES = read()
 
@@ -35,17 +33,17 @@ def test_official_test_sets_stay_test_and_official_training_never_becomes_test()
 def test_proportions_are_close_to_the_targets():
     for dataset in {line["dataset"] for line in LINES}:
         lines = [line for line in LINES if line["dataset"] == dataset]
-        if lines[0]["split"] == "all":  # our own split: 70 / 10 / 20
+        if lines[0]["split"] == "all":
             roles = Counter(line["role"] for line in lines)
             assert abs(roles["test"] / len(lines) - 0.20) < 0.04, (dataset, roles)
             assert abs(roles["val"] / len(lines) - 0.10) < 0.04, (dataset, roles)
-        else:  # validation carved out of the official training set
+        else:
             training = [line for line in lines if line["split"] == "train"]
             val = sum(line["role"] == "val" for line in training)
             assert abs(val / len(training) - 0.10) < 0.03, (dataset, val, len(training))
 
 
-def test_every_stcray_object_keeps_training_scans():
+def test_every_stcray_variant_keeps_training_scans():
     roles = defaultdict(Counter)
     for line in LINES:
         if line["dataset"] == "stcray" and line["split"] == "train":

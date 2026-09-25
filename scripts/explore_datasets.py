@@ -1,8 +1,4 @@
-"""Measure every X-ray dataset the same way: scan formats, bag contents, and item scale.
-
-The scale table answers one question: does the same kind of item cover the same
-number of pixels on every scanner? If not, reading scans at their native pixel
-scale shows kev the same object at different sizes depending on the dataset.
+"""Scan formats, bag contents, item scale per scanner, and a clean-vs-threat shortcut check.
 
     uv run python scripts/explore_datasets.py
 """
@@ -18,8 +14,7 @@ from PIL import Image
 from kev.data.sources import all_scans, image_size, scan_format
 from kev.metrics import auc
 
-PATCH = 16  # kev's patch size in pixels
-# Item types labelled in at least two datasets, matched on the lower-cased label.
+PATCH = 16
 SHARED = ["gun", "knife", "scissors", "pliers", "wrench", "hammer", "screwdriver", "lighter", "battery", "powerbank", "handcuffs", "bullet"]
 
 
@@ -29,7 +24,6 @@ def percentile(values: list[float], p: float) -> float:
 
 
 def fullness(path: Path) -> float:
-    """Share of the image that isn't near-white background: a rough 'how packed is this bag'."""
     with Image.open(path) as im:
         grey = np.asarray(im.convert("L").resize((200, 150)))
     return float((grey < 220).mean())
@@ -37,11 +31,11 @@ def fullness(path: Path) -> float:
 
 def main() -> None:
     scans = list(all_scans())
-    for s in scans:  # some datasets don't record image sizes; read them from the file headers
+    for s in scans:
         if s.sizes is None:
             s.sizes = [image_size(v) for v in s.views]
 
-    print("== 1. Scan formats (one row per dataset and format)")
+    print("== formats")
     groups = defaultdict(list)
     for s in scans:
         groups[(s.dataset, scan_format(s.sizes[0][1]))].append(s)
@@ -53,19 +47,17 @@ def main() -> None:
         print(f"{dataset:<11} {f:<7} {len(group):>7,} {share:>6.0%}  {statistics.median(widths):>5.0f} x {statistics.median(heights):<4.0f}"
               f"  {percentile(heights, 5):>6} - {percentile(heights, 95):<5}  {percentile(widths, 5):>5} - {percentile(widths, 95):<5}")
 
-    print("\n== 2. Bag contents (one row per dataset and split)")
+    print("\n== bag contents")
     print(f"{'dataset':<11} {'split':<12} {'scans':>7} {'clean':>7}  items per bag")
-    for (dataset, split), group in sorted(Counter((s.dataset, s.split) for s in scans).items()):
+    for (dataset, split), _ in sorted(Counter((s.dataset, s.split) for s in scans).items()):
         members = [s for s in scans if s.dataset == dataset and s.split == split]
-        # Count each physical item once, even when it is boxed in two views.
         per_bag = Counter(len([i for i in s.items if i.view == 0]) for s in members)
-        clean = per_bag.get(0, 0)
         spread = ", ".join(f"{k}: {v:,}" for k, v in sorted(per_bag.items()) if k > 0)
-        print(f"{dataset:<11} {split:<12} {len(members):>7,} {clean:>7,}  {spread}")
+        print(f"{dataset:<11} {split:<12} {len(members):>7,} {per_bag.get(0, 0):>7,}  {spread}")
 
-    print(f"\n== 3. Item scale: median item size in pixels (square root of box area), by dataset and format")
-    sizes = defaultdict(list)  # (item, column) -> sizes
-    short_sides = defaultdict(list)  # column -> each box's narrowest side
+    print("\n== median item size (sqrt of box area, px)")
+    sizes = defaultdict(list)
+    short_sides = defaultdict(list)
     for s in scans:
         column = f"{s.dataset}/{scan_format(s.sizes[0][1])}"
         for item in s.items:
@@ -80,8 +72,6 @@ def main() -> None:
     for item in SHARED:
         row = [statistics.median(sizes[(item, c)]) if len(sizes[(item, c)]) >= 20 else None for c in columns]
         print(f"{item:<12}" + "".join(f"{v:>16.0f}" if v else f"{'-':>16}" for v in row))
-
-    # One number per column: how big items appear relative to PIDray's main scanner.
     reference = "pidray/medium"
     print(f"{'vs ' + reference:<12}", end="")
     for c in columns:
@@ -91,8 +81,7 @@ def main() -> None:
     print()
     print(f"{'< 1 patch':<12}" + "".join(f"{sum(v < PATCH for v in short_sides[c]) / len(short_sides[c]):>16.1%}" for c in columns))
 
-    print("\n== 4. Shortcut check: can clean bags be told from threat bags without looking at any threat?")
-    print("AUC: 0.5 = the clue says nothing (good); near 0 or 1 = kev could cheat with it")
+    print("\n== clean vs threat from fullness and image area alone (AUC, 0.5 = no signal)")
     print(f"{'dataset':<11} {'bags':>12}  {'fullness clean / threat':>24} {'AUC':>6}  {'image area AUC':>15}")
     rng = random.Random(0)
     for dataset in ["dvxray", "stcray", "iedxray"]:

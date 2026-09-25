@@ -1,5 +1,3 @@
-"""Check the built manifest (data/manifest.jsonl) is complete and internally consistent."""
-
 from collections import Counter
 
 import pytest
@@ -9,7 +7,7 @@ from kev.data.names import ALLOWED, RESTRICTED, WEAPON
 from kev.data.sources import DATA
 
 if not MANIFEST.exists():
-    pytest.skip("build the manifest first: uv run python -m kev.data.manifest", allow_module_level=True)
+    pytest.skip("manifest not built: uv run python -m kev.data.manifest", allow_module_level=True)
 
 LINES = read()
 
@@ -39,7 +37,6 @@ def test_every_item_is_named_and_grouped():
 
 
 def test_pidray_has_no_clean_bags():
-    # Every PIDray bag holds a threat; a PIDray scan without items would be unlabelled, not clean.
     assert all(line["items"] for line in LINES if line["dataset"] == "pidray")
 
 

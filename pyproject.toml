@@ -5,7 +5,9 @@ description = "A small System One decision model for X-ray baggage screening, bu
 requires-python = ">=3.12"
 dependencies = [
     "numpy",
+    "opencv-python-headless>=5.0.0.93",
     "pillow",
+    "scipy>=1.18.1",
     "torch",
 ]
 

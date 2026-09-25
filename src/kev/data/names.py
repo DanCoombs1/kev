@@ -1,17 +1,9 @@
-"""kev's item names: one plain English name per kind of item, whatever each dataset calls it.
-
-Every item also belongs to one of three groups used by the summary questions. The groups
-follow the policy agreed for kev (loosely based on UK cabin-baggage rules), not any one
-dataset's own idea of what counts as a threat. Labels were checked against real crops
-(runs/explore/2a_unclear_labels.png) before naming: DvXray's "Bat" is a baseball bat, not
-a baton, and its "Pressure_vessel" is an aerosol spray can.
-"""
+"""Maps each dataset's labels to kev item names and screening groups."""
 
 WEAPON = "weapon or explosive"
 RESTRICTED = "restricted"
 ALLOWED = "allowed"
 
-# (dataset, label as the dataset spells it) -> kev's name. COMPASS-XP is handled separately below.
 NAMES = {
     ("pidray", "Baton"): "baton",
     ("pidray", "Bullet"): "bullet",
@@ -73,7 +65,6 @@ NAMES = {
     ("iedxray", "Walkie-Talkie"): "walkie-talkie",
 }
 
-# COMPASS-XP names 370 everyday objects like "carving_knife"; most just lose the underscore.
 COMPASS_RENAMES = {"razor_blades": "razor blade"}
 
 GROUPS = {
@@ -93,7 +84,6 @@ GROUPS = {
     **dict.fromkeys(["laptop", "mobile phone", "pager", "walkie-talkie", "nail clippers"], ALLOWED),
 }
 
-# A more specific name that also counts as a more general one, so "is there a knife?" is yes for a dagger.
 KIND_OF = {
     "bread knife": "knife", "carving knife": "knife", "craft knife": "knife", "penknife": "knife", "dagger": "knife",
     "nail scissors": "scissors", "mallet": "hammer",
@@ -101,16 +91,14 @@ KIND_OF = {
 
 
 def kev_name(dataset: str, label: str) -> str:
-    """kev's name for a dataset label. Raises KeyError for a label nobody has named yet."""
     if dataset == "compass_xp":
         return COMPASS_RENAMES.get(label, label.replace("_", " "))
     return NAMES[(dataset, label)]
 
 
 def group(name: str, dataset: str) -> str:
-    """Which summary group an item belongs to. Only COMPASS-XP's harmless everyday objects may go unlisted."""
     if name in GROUPS:
         return GROUPS[name]
-    if dataset == "compass_xp":
+    if dataset == "compass_xp":  # everything COMPASS-XP flags as harmless
         return ALLOWED
     raise KeyError(f"no group for {name!r} from {dataset}")

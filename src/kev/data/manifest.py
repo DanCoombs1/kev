@@ -1,6 +1,4 @@
-"""The manifest: every scan from every dataset as one line of JSON, in one shape, with kev's item names.
-
-Every later step reads data/manifest.jsonl instead of the five original formats. Build it with:
+"""Builds data/manifest.jsonl: every scan from every dataset in one format, with kev item names.
 
     uv run python -m kev.data.manifest
 """
@@ -14,7 +12,6 @@ from kev.data.sources import DATA, Scan, all_scans, image_size
 
 MANIFEST = DATA / "manifest.jsonl"
 
-# Licence tier per dataset, kept on every line so a commercially usable kev can be trained from "commercial" lines alone.
 TIERS = {
     "stcray": ("commercial", "CC BY 4.0 (paper) / Apache-2.0 (Hugging Face)"),
     "iedxray": ("commercial", "CC BY 4.0"),
@@ -25,11 +22,10 @@ TIERS = {
 
 
 def stcray_staging(stem: str) -> dict:
-    """Decode STCray's filename code, e.g. Gun4_B1_L10_C10_Loc1_phi1_th1_1 -> item variant Gun4, bag B1, ...
+    """Parse STCray's filename code, e.g. Gun4_B1_L10_C10_Loc1_phi1_th1_1.
 
-    The meaning of L, C, Loc, phi and th isn't documented, so they keep their filename letters,
-    and values stay strings because some carry a letter (L4A). Some test scans are named by
-    timestamp instead and carry no code; ~150 explosive scans use another scheme, kept verbatim.
+    Timestamp-named test scans have no code. A few explosive scans use a different scheme,
+    which is kept as-is under "other".
     """
     if re.match(r"\d{4}-\d{2}-\d{2}", stem):
         return {}
@@ -37,16 +33,15 @@ def stcray_staging(stem: str) -> dict:
     staging = {"variant": parts[0]}
     for part in parts[1:]:
         if part.isdigit():
-            staging["shot"] = part  # the repeat number at the end
+            staging["shot"] = part
         elif m := re.fullmatch(r"(B|L|C|Loc|phi|th)(\d+[A-Z]?)", part):
             staging[m.group(1)] = m.group(2)
         else:
-            staging["other"] = part  # e.g. "Explosive (Integrated) P-1 B-2 C-1 BAG-3 L-2"
+            staging["other"] = part
     return staging
 
 
 def clamp(box: tuple[float, float, float, float], size: tuple[int, int]) -> list[float]:
-    """Trim a box to the image: 3 of ~157k boxes stick out by up to 4 px (Step 2c)."""
     x, y, w, h = box
     width, height = size
     x1, y1, x2, y2 = max(0, x), max(0, y), min(width, x + w), min(height, y + h)
@@ -54,9 +49,8 @@ def clamp(box: tuple[float, float, float, float], size: tuple[int, int]) -> list
 
 
 def to_line(scan: Scan) -> dict | None:
-    """One manifest line, or None for a scan kev must not use."""
     if scan.dataset == "pidray" and not scan.items:
-        return None  # unlabelled, not clean: every PIDray bag holds a threat (Step 1b)
+        return None  # every PIDray bag holds a threat, so these are unlabelled rather than clean
     sizes = scan.sizes or [image_size(v) for v in scan.views]
     items = []
     for i in scan.items:
@@ -88,8 +82,7 @@ def to_line(scan: Scan) -> dict | None:
 
 def build() -> list[dict]:
     lines = [line for scan in all_scans() if (line := to_line(scan)) is not None]
-    ids = Counter(line["id"] for line in lines)
-    duplicates = [i for i, n in ids.items() if n > 1]
+    duplicates = [i for i, n in Counter(line["id"] for line in lines).items() if n > 1]
     assert not duplicates, f"duplicate ids: {duplicates[:5]}"
     return lines
 

@@ -1,5 +1,3 @@
-"""Check the cleaned dataset (data/curated.jsonl) against the published manifest and the copies found in Step 3a."""
-
 import json
 
 import pytest
@@ -10,7 +8,7 @@ from kev.data.manifest import read as read_manifest
 from kev.data.sources import scan_format
 
 if not CURATED.exists():
-    pytest.skip("build it first: uv run python -m kev.data.curate", allow_module_level=True)
+    pytest.skip("curated data not built: uv run python -m kev.data.curate", allow_module_level=True)
 
 CURATED_LINES = {line["id"]: line for line in read()}
 PUBLISHED = {line["id"]: line for line in read_manifest()}
@@ -18,7 +16,6 @@ COPIES = [p for p in json.loads(DUPLICATES.read_text()) if p["different"] <= SAM
 
 
 def test_no_two_surviving_scans_are_copies():
-    # This is also what guarantees no copy of a test scan remains in training.
     both = [p for p in COPIES if p["a"] in CURATED_LINES and p["b"] in CURATED_LINES]
     assert not both, both[:3]
 

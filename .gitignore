@@ -2,7 +2,5 @@
 __pycache__/
 .venv/
 
-# Downloaded corpora and datasets; scripts in the repo recreate them
 /data/
-# Checkpoints and training logs; too big for git
 /runs/
