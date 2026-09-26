@@ -15,6 +15,7 @@ import time
 import unicodedata
 from collections import Counter, defaultdict
 from collections.abc import Iterable
+from itertools import batched
 from multiprocessing import Pool
 from pathlib import Path
 
@@ -170,17 +171,6 @@ def train(chunk_counts: Counter, n_merges: int, report: int = 0) -> list[tuple[i
     return merges
 
 
-def _batches(items: Iterable[str], size: int) -> Iterable[list[str]]:
-    batch = []
-    for item in items:
-        batch.append(item)
-        if len(batch) == size:
-            yield batch
-            batch = []
-    if batch:
-        yield batch
-
-
 def main() -> None:
     from kev.data.text import squad_questions, wikitext
     from kev.questions.bank import training_text
@@ -188,7 +178,7 @@ def main() -> None:
     start = time.perf_counter()
     counts = Counter()
     with Pool() as pool:
-        for part in pool.imap_unordered(count_chunks, _batches(wikitext("train"), 10_000)):
+        for part in pool.imap_unordered(count_chunks, batched(wikitext("train"), 10_000)):
             counts.update(part)
     for chunk, n in count_chunks(squad_questions("train")).items():
         counts[chunk] += n * SQUAD_WEIGHT

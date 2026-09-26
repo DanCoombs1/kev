@@ -1,11 +1,12 @@
+import itertools
 import random
 
 import torch
 
 from kev.model.blocks import WIDTH
-from kev.model.text import TextEncoder
-from kev.pretrain.text import mask_words
-from kev.tokenizer.bpe import BYTES, MASK, PAD
+from kev.model.text import MAX_TOKENS, TextEncoder
+from kev.pretrain.text import PEAK_LR, _encode, learning_rate, mask_words
+from kev.tokenizer.bpe import BYTES, MASK, PAD, Tokenizer
 
 torch.manual_seed(0)
 VOCAB = BYTES + 256 + 100
@@ -47,3 +48,19 @@ def test_whole_words_are_hidden_about_15_percent_of_the_time():
         words += len(sentence)
     assert 0.14 < hidden / words < 0.17
     assert 0.77 < masked / hidden < 0.83
+
+
+def test_texts_are_cut_at_word_boundaries_into_short_enough_sequences():
+    text = " ".join(["the spanner is in the luggage"] * 60)
+    tokens, starts, lengths = _encode((text, "is there a knife?"))
+    assert max(lengths) <= MAX_TOKENS and sum(lengths) == len(tokens) == len(starts)
+    offsets = [0, *itertools.accumulate(lengths)]
+    assert all(starts[a] for a in offsets[:-1])  # every sequence begins with a whole word
+    assert Tokenizer.load().decode(tokens[offsets[-2]:].tolist()) == "is there a knife?"
+
+
+def test_learning_rate_warms_up_then_decays_to_a_tenth():
+    rates = [learning_rate(step, 1000) for step in range(1000)]
+    assert rates[0] < rates[10] < rates[19] == PEAK_LR
+    assert all(a >= b for a, b in zip(rates[20:], rates[21:]))
+    assert abs(rates[-1] - PEAK_LR / 10) < 1e-6
