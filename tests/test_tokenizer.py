@@ -43,7 +43,7 @@ def test_text_survives_encoding():
 
 def test_special_tokens_cannot_be_typed():
     tokenizer = Tokenizer(train(count_chunks(training_text()), 200))
-    ids = tokenizer.question("[q] [o] [none] [pad] is there a knife?")
+    ids = tokenizer.question("[q] [o] [none] [pad] [mask] is there a knife?")
     assert ids[0] == QUESTION and min(ids[1:]) >= BYTES
     assert tokenizer.option("knife")[0] == OPTION and tokenizer.none_option() == [OPTION, NONE]
 
@@ -55,6 +55,13 @@ def test_saved_tokenizer_loads_the_same_and_can_be_cut_short(tmp_path):
     assert loaded.merges == tokenizer.merges and loaded.encode("any knives?") == tokenizer.encode("any knives?")
     short = Tokenizer.load(tmp_path / "t.json", merges=50)
     assert len(short) == BYTES + 256 + 50 and short.merges == tokenizer.merges[:50]
+
+
+def test_words_group_the_same_ids():
+    tokenizer = Tokenizer(train(count_chunks(training_text()), 200))
+    words = tokenizer.encode_words("do you reckon there are spanners in here?")
+    assert [i for w in words for i in w] == tokenizer.encode("do you reckon there are spanners in here?")
+    assert tokenizer.decode(words[5]) == " spanners"
 
 
 def test_pad_marks_real_tokens():

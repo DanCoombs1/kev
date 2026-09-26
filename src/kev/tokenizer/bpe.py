@@ -2,7 +2,8 @@
 
 Text is normalised (NFKC, lowercase, single spaces) and split into chunks that merges never cross. Each chunk's
 UTF-8 bytes are then merged in the order the merges were learned. Special tokens are only added by question(),
-option() and none_option(), never read from text, so typing "[q]" can't produce the question marker.
+option(), none_option() and the text pretraining, never read from text, so typing "[q]" can't produce the question
+marker.
 
     uv run python -m kev.tokenizer.bpe      (trains on data/text and the question bank, writes data/tokenizer.json)
 """
@@ -21,8 +22,8 @@ import torch
 
 from kev.data.sources import DATA
 
-SPECIALS = ["[pad]", "[q]", "[o]", "[none]"]
-PAD, QUESTION, OPTION, NONE = range(len(SPECIALS))
+SPECIALS = ["[pad]", "[q]", "[o]", "[none]", "[mask]"]
+PAD, QUESTION, OPTION, NONE, MASK = range(len(SPECIALS))
 BYTES = len(SPECIALS)  # id of byte 0; merges start at BYTES + 256
 
 # Words keep their leading space, contractions stay together, and every digit is its own chunk.
@@ -78,6 +79,10 @@ class Tokenizer:
 
     def encode(self, text: str) -> list[int]:
         return [i for chunk in PATTERN.findall(normalize(text)) for i in self._chunk(chunk)]
+
+    def encode_words(self, text: str) -> list[list[int]]:
+        """Token ids grouped by chunk, so a word's pieces can be hidden together."""
+        return [self._chunk(chunk) for chunk in PATTERN.findall(normalize(text))]
 
     def decode(self, ids: Iterable[int]) -> str:
         return b"".join(self.vocab[i] for i in ids if i >= BYTES).decode("utf-8", errors="replace")
