@@ -12,19 +12,16 @@ from multiprocessing import Pool
 from pathlib import Path
 
 import numpy as np
-import torch
 from PIL import Image
-from torch import nn
 
 from kev.data.curate import read
 from kev.data.duplicates import content_box
 from kev.data.sources import DATA
 from kev.device import pick_device
-from kev.metrics import auc
+from kev.probe import train_and_score
 
 SIZE = 96
 DATASETS = ["dvxray", "stcray"]
-EPOCHS = 15
 OUT = Path(__file__).resolve().parents[1] / "runs" / "explore"
 
 
@@ -90,57 +87,6 @@ def prepare_all(clean: list[dict], threat: list[dict], rng: random.Random, pool:
     untouched, blanked = zip(*pool.map(prepare, jobs, chunksize=64))
     labels = np.array([0] * len(clean) + [1] * len(threat), dtype=np.float32)
     return np.stack(untouched), np.stack(blanked), labels
-
-
-class Probe(nn.Module):
-    def __init__(self):
-        super().__init__()
-        layers = []
-        channels = [3, 16, 32, 64, 128]
-        for c_in, c_out in zip(channels, channels[1:]):
-            layers += [nn.Conv2d(c_in, c_out, 3, stride=2, padding=1), nn.BatchNorm2d(c_out), nn.ReLU()]
-        self.features = nn.Sequential(*layers)
-        self.score = nn.Linear(channels[-1], 1)
-
-    def forward(self, images: torch.Tensor) -> torch.Tensor:
-        return self.score(self.features(images).mean(dim=(2, 3))).squeeze(1)
-
-
-def to_tensor(thumbnails: np.ndarray) -> torch.Tensor:
-    return torch.from_numpy(thumbnails).permute(0, 3, 1, 2).float() / 255 - 0.5
-
-
-def scores(model: nn.Module, images: torch.Tensor, device: torch.device) -> np.ndarray:
-    model.eval()
-    with torch.no_grad():
-        return torch.cat([model(images[i: i + 256].to(device)).cpu() for i in range(0, len(images), 256)]).numpy()
-
-
-def train_and_score(train_x, train_y, val_x, val_y, device, label: str) -> float:
-    torch.manual_seed(0)
-    model = Probe().to(device)
-    optimiser = torch.optim.AdamW(model.parameters(), lr=1e-3, weight_decay=1e-4)
-    loss_fn = nn.BCEWithLogitsLoss()
-    train_x, train_y, val_x = to_tensor(train_x), torch.from_numpy(train_y), to_tensor(val_x)
-    for epoch in range(1, EPOCHS + 1):
-        model.train()
-        order = torch.randperm(len(train_x))
-        total = 0.0
-        for start in range(0, len(order), 128):
-            batch = order[start: start + 128]
-            images, answers = train_x[batch].to(device), train_y[batch].to(device)
-            flip = torch.rand(len(images), 1, 1, 1, device=device) < 0.5
-            images = torch.where(flip, images.flip(3), images)
-            loss = loss_fn(model(images), answers)
-            optimiser.zero_grad()
-            loss.backward()
-            optimiser.step()
-            total += loss.item() * len(batch)
-        val_scores = scores(model, val_x, device)
-        val_auc = auc(val_scores[val_y == 1].tolist(), val_scores[val_y == 0].tolist())
-        if epoch in (1, 5, 10, EPOCHS):
-            print(f"   {label:<9} epoch {epoch:>2}: train loss {total / len(order):.3f}   val AUC {val_auc:.2f}")
-    return val_auc
 
 
 def save_examples(untouched: np.ndarray, blanked: np.ndarray, labels: np.ndarray, dataset: str) -> None:

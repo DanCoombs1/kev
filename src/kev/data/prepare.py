@@ -49,17 +49,23 @@ def crop_region(grey: np.ndarray, boxes: list[list[float]]) -> tuple[int, int, i
     return max(0, x0 - MARGIN), max(0, y0 - MARGIN), min(width, x1 + MARGIN), min(height, y1 + MARGIN)
 
 
-def prepare_view(line: dict, view: int = 0) -> Prepared:
-    if line["dataset"] not in SCALE:
-        raise ValueError(f"no scale for {line['dataset']}")
-    with Image.open(DATA / line["views"][view]) as im:
-        rgb = im.convert("RGB")
-    boxes = [i["box"] for i in line["items"] if i["view"] == view and i["box"]]
+def prepare_image(rgb: Image.Image, dataset: str, boxes: list[list[float]], zoom: float = 1.0) -> Prepared:
+    if dataset not in SCALE:
+        raise ValueError(f"no scale for {dataset}")
     crop = crop_region(np.asarray(rgb.convert("L")), boxes)
     width, height = crop[2] - crop[0], crop[3] - crop[1]
-    scale = SCALE[line["dataset"]]
+    scale = SCALE[dataset] * zoom
     patches = (width * scale / PATCH) * (height * scale / PATCH)
     if patches > MAX_PATCHES:
         scale *= (MAX_PATCHES / patches) ** 0.5
     size = (max(1, round(width * scale)), max(1, round(height * scale)))
     return Prepared(rgb.crop(crop).resize(size, Image.Resampling.BILINEAR), crop, scale)
+
+
+def prepare_view(line: dict, view: int = 0, zoom: float = 1.0) -> Prepared:
+    if line["dataset"] not in SCALE:
+        raise ValueError(f"no scale for {line['dataset']}")
+    with Image.open(DATA / line["views"][view]) as im:
+        rgb = im.convert("RGB")
+    boxes = [i["box"] for i in line["items"] if i["view"] == view and i["box"]]
+    return prepare_image(rgb, line["dataset"], boxes, zoom)
