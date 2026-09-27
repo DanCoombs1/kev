@@ -34,7 +34,7 @@ def test_collate_packs_each_sample_into_one_sequence():
     samples = [{"views": [torch.zeros(3, 40, 70, dtype=torch.uint8)], "items": []},
                {"views": [torch.zeros(3, 33, 20, dtype=torch.uint8), torch.zeros(3, 16, 16, dtype=torch.uint8)], "items": []}]
     batch = collate(samples)
-    assert batch["patches"].shape == (2, 15, 3 * PATCH * PATCH)
+    assert batch["patches"].shape == (2, 64, 3 * PATCH * PATCH)
     assert batch["valid"].sum(dim=1).tolist() == [15, 7]
     assert batch["view"][1, :7].tolist() == [0] * 6 + [1]
     assert batch["row"][1, :7].tolist() == [0, 0, 1, 1, 2, 2, 0] and batch["col"][1, :7].tolist() == [0, 1, 0, 1, 0, 1, 0]

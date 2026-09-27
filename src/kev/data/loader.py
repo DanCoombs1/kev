@@ -21,6 +21,7 @@ from kev.data.sources import DATA
 
 ZOOM = 0.2
 LIBRARY_SIZES = {"train": 5000, "val": 600, "test": 1000}
+ROUND_TO = 64  # batch lengths come in few shapes, so the GPU reuses the kernels it built for each
 
 
 @dataclass
@@ -208,7 +209,7 @@ def collate(samples: list[dict]) -> dict:
             row, col = torch.meshgrid(torch.arange(rows), torch.arange(cols), indexing="ij")
             parts.append((patches, row.flatten(), col.flatten(), torch.full((rows * cols,), v), (rows, cols)))
         sequences.append([torch.cat([p[i] for p in parts]) for i in range(4)] + [[p[4] for p in parts]])
-    length = max(len(seq[0]) for seq in sequences)
+    length = -(-max(len(seq[0]) for seq in sequences) // ROUND_TO) * ROUND_TO
     batch = len(samples)
     patches = torch.full((batch, length, 3 * PATCH * PATCH), 255, dtype=torch.uint8)
     row, col, view = (torch.zeros((batch, length), dtype=torch.long) for _ in range(3))

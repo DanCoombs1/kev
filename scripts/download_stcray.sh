@@ -10,7 +10,7 @@ if ! hf auth whoami > /dev/null 2>&1; then
   exit 1
 fi
 
-for part in STCray_TrainSet STCray_TestSet STCray_Augmented; do
+for part in STCray_TrainSet STCray_TestSet; do
   if [ -f "stcray/.complete_$part" ]; then
     echo "$part: already done"
     continue

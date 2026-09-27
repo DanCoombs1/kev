@@ -72,12 +72,10 @@ def iedxray() -> Iterator[Scan]:
         yield from _coco(root / "annotations" / f"complete_{split}.json", root / folder, "iedxray", split)
 
 
-def stcray(include_augmented: bool = False) -> Iterator[Scan]:
+def stcray() -> Iterator[Scan]:
     root = DATA / "stcray"
-    splits = [("train", "STCray_TrainSet", "Images", "Json_BB"), ("test", "STCray_TestSet", "Images", "Json_BB")]
-    if include_augmented:
-        splits.append(("augmented", "STCray_Augmented", "Threat_Items_Images", "Threat_Items_Json_BB"))
-    for split, folder, image_dir, box_dir in splits:
+    for split, folder, image_dir, box_dir in [("train", "STCray_TrainSet", "Images", "Json_BB"),
+                                              ("test", "STCray_TestSet", "Images", "Json_BB")]:
         for type_folder in sorted((root / folder / image_dir).iterdir()):
             if not type_folder.is_dir():
                 continue
@@ -120,9 +118,9 @@ def compass_xp() -> Iterator[Scan]:
             yield Scan("compass_xp", "all", [root / "Colour" / f"{row['basename']}.png"], None, [Item(row["class"])], meta)
 
 
-def all_scans(include_augmented: bool = False) -> Iterator[Scan]:
+def all_scans() -> Iterator[Scan]:
     yield from pidray()
-    yield from stcray(include_augmented)
+    yield from stcray()
     yield from dvxray()
     yield from iedxray()
     yield from compass_xp()
