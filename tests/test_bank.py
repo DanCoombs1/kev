@@ -3,7 +3,7 @@ import re
 from kev.data.names import NAMES
 from kev.questions.bank import (
     ABSENT, ABSENT_HELD_OUT, GROUP_NOUNS, GROUP_NOUNS_HELD_OUT, ITEMS, ITEMS_HELD_OUT, PRESENT, PRESENT_HELD_OUT,
-    WHICH, WHICH_HELD_OUT, held_out_questions, training_text,
+    WHICH, WHICH_ALL, WHICH_ALL_HELD_OUT, WHICH_HELD_OUT, held_out_questions, training_text,
 )
 
 
@@ -26,13 +26,13 @@ def test_held_out_wording_never_reaches_training():
         for nouns in table.values():
             for n in nouns:
                 assert not re.search(rf"\b{re.escape(n.word.lower())}\b", text), n.word
-    assert not set(PRESENT_HELD_OUT + ABSENT_HELD_OUT + WHICH_HELD_OUT) & set(PRESENT + ABSENT + WHICH)
+    assert not set(PRESENT_HELD_OUT + ABSENT_HELD_OUT + WHICH_HELD_OUT + WHICH_ALL_HELD_OUT) & set(PRESENT + ABSENT + WHICH + WHICH_ALL)
 
 
 def test_sentences_have_the_right_slots():
     for template in PRESENT + ABSENT + PRESENT_HELD_OUT + ABSENT_HELD_OUT:
         assert ("{one}" in template) != ("{many}" in template), template
-    for template in WHICH + WHICH_HELD_OUT:
+    for template in WHICH + WHICH_HELD_OUT + WHICH_ALL + WHICH_ALL_HELD_OUT:
         assert "{" not in template, template
 
 

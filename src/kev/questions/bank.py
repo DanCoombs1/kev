@@ -180,6 +180,25 @@ WHICH_HELD_OUT = [
     "pick the item you can see",
 ]
 
+# The options are items, and any number of them can be right.
+WHICH_ALL = [
+    "which of these are in the bag?",
+    "which of these are in this bag?",
+    "which of these items are present?",
+    "which of the following can you see? pick all that apply",
+    "select everything that is in this bag",
+    "what is in this bag? choose all that apply",
+    "tick every item you can see in the scan",
+    "which of these does the bag contain?",
+    "mark all of these that are in the bag",
+    "which of these has this passenger packed? pick all that apply",
+]
+
+WHICH_ALL_HELD_OUT = [
+    "which of these are inside the luggage?",
+    "pick every item packed in this suitcase",
+]
+
 YES, NO = "yes", "no"
 
 
@@ -195,7 +214,7 @@ def training_text() -> list[str]:
     """Every training question and option, for the tokenizer."""
     things = _nouns(ITEMS, GROUP_NOUNS)
     questions = [ask(t, n) for t in PRESENT + ABSENT for n in things]
-    return questions + WHICH + [n.word for n in _nouns(ITEMS)] + [YES, NO]
+    return questions + WHICH + WHICH_ALL + [n.word for n in _nouns(ITEMS)] + [YES, NO]
 
 
 def held_out_questions() -> dict[str, list[str]]:
@@ -203,7 +222,7 @@ def held_out_questions() -> dict[str, list[str]]:
     old_templates, new_templates = PRESENT + ABSENT, PRESENT_HELD_OUT + ABSENT_HELD_OUT
     return {
         "new word": [ask(t, n) for t in old_templates for n in new_things],
-        "new sentence": [ask(t, n) for t in new_templates for n in old_things] + WHICH_HELD_OUT,
+        "new sentence": [ask(t, n) for t in new_templates for n in old_things] + WHICH_HELD_OUT + WHICH_ALL_HELD_OUT,
         "both new": [ask(t, n) for t in new_templates for n in new_things],
     }
 
@@ -214,7 +233,8 @@ def main() -> None:
     print(f"items: {len(ITEMS)}, {len(_nouns(ITEMS))} training names, {len(_nouns(ITEMS_HELD_OUT))} held out")
     print(f"groups: {len(GROUP_NOUNS)}, {len(_nouns(GROUP_NOUNS))} training names, {len(_nouns(GROUP_NOUNS_HELD_OUT))} held out")
     print(f"sentences: present {len(PRESENT)} (+{len(PRESENT_HELD_OUT)} held out), "
-          f"absent {len(ABSENT)} (+{len(ABSENT_HELD_OUT)}), which {len(WHICH)} (+{len(WHICH_HELD_OUT)})")
+          f"absent {len(ABSENT)} (+{len(ABSENT_HELD_OUT)}), which {len(WHICH)} (+{len(WHICH_HELD_OUT)}), "
+          f"which-all {len(WHICH_ALL)} (+{len(WHICH_ALL_HELD_OUT)})")
     print(f"training text: {len(set(train)):,} distinct lines, {len(' '.join(train).split()):,} words\n")
     for line in rng.sample(train, 12):
         print(f"  {line}")

@@ -66,8 +66,10 @@ class Kev(nn.Module):
         each for any_of; see probabilities()."""
         memory = self.image(scan["patches"], scan["row"], scan["col"], scan["view"], scan["valid"])
         x = self.read(self.question_reader, questions["ids"], questions["mask"]) + self.types[questions["type"]]
+        valid = questions["valid"].clone()
+        valid[:, 0] |= ~valid.any(dim=1)  # a scan without questions keeps attention finite; its slot scores nothing
         for block in self.blocks:
-            x = block(x, questions["valid"], memory, scan["valid"])
+            x = block(x, valid, memory, scan["valid"])
         answers = self.answer(self.norm(x))
         options = self.read(self.option_reader, questions["option_ids"], questions["option_mask"])
         options = torch.where(questions["is_none"][..., None], self.none, options)
