@@ -44,3 +44,21 @@ class Block(nn.Module):
     def forward(self, x: torch.Tensor, mask: torch.Tensor | None = None) -> torch.Tensor:
         x = x + self.attention(self.attention_norm(x), mask)
         return x + self.feed_forward(self.feed_forward_norm(x))
+
+
+class DecoderBlock(nn.Module):
+    """Questions look at each other, then at the scan's patches."""
+
+    def __init__(self, width: int = WIDTH, heads: int = HEADS):
+        super().__init__()
+        self.self_norm = nn.LayerNorm(width)
+        self.self_attention = Attention(width, heads)
+        self.cross_norm = nn.LayerNorm(width)
+        self.cross_attention = Attention(width, heads)
+        self.feed_forward_norm = nn.LayerNorm(width)
+        self.feed_forward = nn.Sequential(nn.Linear(width, 4 * width), nn.GELU(), nn.Linear(4 * width, width))
+
+    def forward(self, x: torch.Tensor, mask: torch.Tensor, memory: torch.Tensor, memory_mask: torch.Tensor) -> torch.Tensor:
+        x = x + self.self_attention(self.self_norm(x), mask)
+        x = x + self.cross_attention(self.cross_norm(x), memory_mask, context=memory)
+        return x + self.feed_forward(self.feed_forward_norm(x))
