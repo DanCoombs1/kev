@@ -1,7 +1,8 @@
 """Picks the questions a scan is asked, and their answers.
 
 Items are picked without looking at the bag, so "no" is as common as in real bags. Only items the scan's dataset labels
-are asked about, since only those have trustworthy answers.
+are asked about, since only those have trustworthy answers. Every scan also gets one any-of question listing all of
+them, so each item in the bag says "yes" somewhere without the question being chosen for it.
 
     uv run python -m kev.questions.generate     (prints questions for a few training scans)
 """
@@ -19,7 +20,7 @@ from kev.questions.bank import (
 )
 from kev.tokenizer.bpe import PAD, Tokenizer
 
-QUESTIONS_PER_SCAN = 6
+QUESTIONS_PER_SCAN = 8
 KINDS = {YES_NO: 0.5, ONE_OF: 0.25, ANY_OF: 0.25}
 NEGATED = 0.25  # of yes/no questions worded the other way round ("is this bag free of knives?")
 OPTION_COUNTS = {ONE_OF: (2, 4), ANY_OF: (2, 5)}
@@ -64,6 +65,7 @@ class Question:
     scored: list[bool]  # options whose answer is known; any_of leaves ambiguous ones out
     about: list[str | None]  # the item or group each option is about (yes/no: the one asked about)
     negated: bool = False
+    template: str = ""  # the sentence it was made from
 
 
 def present(sample: dict) -> set[str]:
@@ -87,9 +89,9 @@ def _noun(table: dict[str, list[Noun]], fallback: dict[str, list[Noun]], key: st
 
 def _yes_no(about: str, yes: bool, noun: Noun, rng: random.Random, wording: Wording) -> Question:
     negated = rng.random() < NEGATED
-    text = ask(rng.choice(wording.absent if negated else wording.present), noun)
+    template = rng.choice(wording.absent if negated else wording.present)
     right = yes != negated
-    return Question(YES_NO, text, [YES, NO], [right, not right], [True, True], [about], negated)
+    return Question(YES_NO, ask(template, noun), [YES, NO], [right, not right], [True, True], [about], negated, template)
 
 
 def summary(group: str, sample: dict, rng: random.Random, wording: Wording) -> Question:
@@ -112,13 +114,23 @@ def which(kind: int, dataset: str, there: set[str], rng: random.Random, wording:
     answer = [i in there for i in items]
     if kind == ANY_OF:
         scored = [not unclear(i, there) for i in items]
-        return Question(ANY_OF, rng.choice(wording.which_all), words, answer, scored, items) if any(scored) else None
+        template = rng.choice(wording.which_all)
+        return Question(ANY_OF, template, words, answer, scored, items, template=template) if any(scored) else None
     if sum(answer) > 1 or any(unclear(i, there) for i in items):  # one_of promises a single right answer
         return None
     options, answer, about = words + [None], answer + [not any(answer)], items + [None]
     order = rng.sample(range(len(options)), len(options))
-    return Question(ONE_OF, rng.choice(wording.which), [options[k] for k in order], [answer[k] for k in order],
-                    [True] * len(options), [about[k] for k in order])
+    template = rng.choice(wording.which)
+    return Question(ONE_OF, template, [options[k] for k in order], [answer[k] for k in order],
+                    [True] * len(options), [about[k] for k in order], template=template)
+
+
+def everything(dataset: str, there: set[str], rng: random.Random, wording: Wording) -> Question:
+    """Any-of over every item the dataset labels, in a random order."""
+    items = rng.sample(ASKABLE[dataset], len(ASKABLE[dataset]))
+    template = rng.choice(wording.which_all)
+    return Question(ANY_OF, template, [_noun(wording.items, ITEMS, i, rng).word for i in items], [i in there for i in items],
+                    [not unclear(i, there) for i in items], items, template=template)
 
 
 def questions_for(sample: dict, rng: random.Random, wording: Wording = TRAINING,
@@ -126,6 +138,7 @@ def questions_for(sample: dict, rng: random.Random, wording: Wording = TRAINING,
     questions = [summary(g, sample, rng, wording) for g in (WEAPON, RESTRICTED)] if sample["pair"] else []
     if asks_about_items(sample):
         there = present(sample)
+        questions.append(everything(sample["dataset"], there, rng, wording))
         for _ in range(count * TRIES):
             if len(questions) >= count:
                 break

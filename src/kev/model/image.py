@@ -7,6 +7,7 @@ patches can be encoded, in any order, since each carries its own position.
 import torch
 import torch.nn.functional as F
 from torch import nn
+from torch.utils.checkpoint import checkpoint
 
 from kev.data.prepare import PATCH
 from kev.model.blocks import WIDTH, Block
@@ -52,10 +53,11 @@ class ImageEncoder(nn.Module):
             nn.init.normal_(table, std=0.02)
         self.blocks = nn.ModuleList(Block(width) for _ in range(layers))
         self.norm = nn.LayerNorm(width)
+        self.checkpointing = False  # recompute each block during the backward pass instead of storing it: less memory
 
     def forward(self, patches: torch.Tensor, row: torch.Tensor, col: torch.Tensor, view: torch.Tensor,
                 mask: torch.Tensor) -> torch.Tensor:
         x = self.stem(patches) + self.rows[row] + self.cols[col] + self.views[view]
         for block in self.blocks:
-            x = block(x, mask)
+            x = checkpoint(block, x, mask, use_reentrant=False) if self.checkpointing and self.training else block(x, mask)
         return self.norm(x)

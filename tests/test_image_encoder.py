@@ -52,3 +52,16 @@ def test_listing_order_doesnt_matter_but_position_does():
 
 def test_size():
     assert 16.5e6 < sum(p.numel() for p in ImageEncoder().parameters()) < 17e6
+
+
+def test_checkpointing_gives_the_same_result_and_gradients():
+    b = batch()
+    model = ImageEncoder(layers=2)
+    grads = []
+    for checkpointing in (False, True):
+        model.zero_grad()
+        model.checkpointing = checkpointing
+        out = encode(model, b)
+        out.sum().backward()
+        grads.append((out.detach(), model.stem.tile.weight.grad.clone()))
+    assert torch.allclose(grads[0][0], grads[1][0], atol=1e-5) and torch.allclose(grads[0][1], grads[1][1], atol=1e-4)

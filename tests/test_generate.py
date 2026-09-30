@@ -81,3 +81,14 @@ def test_batch_marks_questions_options_and_none():
             assert b["is_none"][s, n, : len(q.options)].tolist() == [o is None for o in q.options]
             assert b["answer"][s, n, : len(q.options)].tolist() == q.answer
             assert tokenizer.decode(b["ids"][s, n][b["mask"][s, n]].tolist()) == q.text.lower()
+
+
+def test_every_scan_gets_one_question_listing_every_item():
+    for sample in (bag("pidray", "knife"), bag("stcray", "box cutter", pair=True), bag("iedxray", "modified pager")):
+        full = [q for q in questions_for(sample, random.Random(0)) if q.type == ANY_OF and len(q.options) == len(ASKABLE[sample["dataset"]])]
+        assert len(full) == 1 and sorted(full[0].about) == ASKABLE[sample["dataset"]]
+        q = full[0]
+        there = {i["name"] for i in sample["items"]}
+        for item, answer, scored in zip(q.about, q.answer, q.scored):
+            assert answer == (item in there or (item == "pager" and "modified pager" in there))
+            assert scored or item in ("knife", "other sharp object", "explosive")  # only the ambiguous ones are left out

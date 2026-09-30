@@ -120,11 +120,11 @@ def learning_rate(step: int, total: int) -> float:
     return PEAK_LR * (0.1 + 0.45 * (1 + math.cos(math.pi * progress)))
 
 
-def passes_since_gain(val_losses: list[float]) -> int:
-    """Passes since the validation loss last beat its best by at least MIN_GAIN; the first entry is before training."""
+def passes_since_gain(val_losses: list[float], min_gain: float = MIN_GAIN) -> int:
+    """Passes since the validation loss last beat its best by at least min_gain; the first entry is before training."""
     best, best_at = val_losses[0], 0
     for n, loss in enumerate(val_losses[1:], 1):
-        if loss < best - MIN_GAIN:
+        if loss < best - min_gain:
             best, best_at = loss, n
     return len(val_losses) - 1 - best_at
 
